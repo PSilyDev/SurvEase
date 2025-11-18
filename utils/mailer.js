@@ -1,45 +1,57 @@
 // utils/mailer.js
-const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-const ENABLE_EMAIL = process.env.ENABLE_EMAIL === "true";
+// Using Resend HTTP API instead of SMTP
+// Works on Render because it's just HTTPS (port 443)
 
-let transporter = null;
-
-if (ENABLE_EMAIL) {
-  transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-      user: process.env.SMTP_MAIL,
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
-
-  transporter.verify((err) => {
-    if (err) {
-      console.error("SMTP verify error (ignored):", err.message);
-    } else {
-      console.log("SMTP server is ready to take messages");
-    }
-  });
-}
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const EMAIL_FROM =
+  process.env.EMAIL_FROM || "SurvEase <onboarding@resend.dev>";
+const EMAIL_ENABLED = process.env.EMAIL_ENABLED !== "false"; // default: enabled
 
 async function sendEmail(options) {
-  if (!transporter) {
-    console.log("Email disabled, skipping send:", options.to);
+  const { to, subject, html, text } = options;
+
+  if (!EMAIL_ENABLED) {
+    console.log("[MAILER] Email disabled, skipping send:", to);
+    return;
+  }
+
+  if (!RESEND_API_KEY) {
+    console.error("[MAILER] RESEND_API_KEY missing, cannot send email");
     return;
   }
 
   try {
-    await transporter.sendMail(options);
+    // Node 18+ has global fetch; Render uses Node 22.x
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
+        text,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error("[MAILER] Resend error:", data);
+    } else {
+      console.log("[MAILER] Email sent via Resend:", data.id || data);
+    }
   } catch (err) {
-    console.error("Email send failed (ignored):", err.message);
+    console.error("[MAILER] HTTP error sending email:", err.message || err);
   }
 }
 
-// keep backwards compatibility
+// Keep both names so existing controllers continue to work
 module.exports = {
   sendEmail,
   sendSignupEmail: sendEmail,

@@ -14,7 +14,7 @@ const bcryptjs = require("bcryptjs");
 // import jsonwebtoken for creating token
 const jwt = require("jsonwebtoken");
 
-// ✅ import mail helper (safe, non-blocking, no-op in production when ENABLE_EMAIL=false)
+// ✅ import mail helper (now backed by Resend HTTP API)
 const { sendSignupEmail } = require("../utils/mailer");
 
 // controller function for get request
@@ -50,19 +50,16 @@ const createUser = async (req, res) => {
   // save the userDocument in the database
   const newUser = await userDocument.save();
 
-  // ✅ fire-and-forget welcome email
-  // This will:
-  // - do nothing in production when ENABLE_EMAIL !== "true" (Render)
-  // - send mail locally if ENABLE_EMAIL=true and SMTP_* env vars are set
+  // ✅ fire-and-forget welcome email (Resend will handle it)
   try {
     sendSignupEmail({
-      from: process.env.SMTP_MAIL,
       to: newUser.email,
       subject: "Welcome to SurvEase",
-      text: `Hi ${newUser.first_name || newUser.username},\n\nThanks for signing up for SurvEase!`,
+      text: `Hi ${
+        newUser.first_name || newUser.username
+      },\n\nThanks for signing up for SurvEase!`,
     });
   } catch (err) {
-    // Make sure email issues NEVER break signup
     console.error("sendSignupEmail error (ignored):", err.message);
   }
 
@@ -111,13 +108,10 @@ const loginUser = async (req, res) => {
 
 // controller for get user by username
 const getUserByUsername = async (req, res) => {
-  // get username from url parameter
   const { username } = req.params;
 
-  // find user from database
   const user = await User.findOne({ username });
 
-  // check if user is found
   if (!user) {
     return res.send({ message: "User not found in DB" });
   }
@@ -129,7 +123,6 @@ const getUserByUsername = async (req, res) => {
 const updateUser = async (req, res) => {
   const userDetails = req.body;
 
-  // check if the ID is provided in the request body
   if (!userDetails.id) {
     return res.status(400).send({ message: "User Id is required" });
   }
@@ -139,7 +132,7 @@ const updateUser = async (req, res) => {
       { _id: userDetails.id },
       { $set: userDetails },
       { new: true }
-    ); // new = true returns the updated object
+    );
 
     if (!user) {
       return res.status(400).send({ message: "User not found in DB" });

@@ -5,7 +5,7 @@ const { default: mongoose } = require("mongoose");
 const SurveyModel = require("../storeSurveysDB");
 require("dotenv").config();
 
-// ✅ use shared mail helper instead of raw nodemailer here
+// ✅ use shared mail helper instead of nodemailer
 const { sendEmail: sendMailHelper } = require("../utils/mailer");
 
 let nanoid;
@@ -14,7 +14,7 @@ let nanoid;
   nanoid = mod.nanoid;
 })();
 
-// controller function to get request
+// controller function for get request
 const getSurveys = async (req, res) => {
   const surveyList = await SurveyModel.find();
   res.send({ message: "All surveys - ", payload: surveyList });
@@ -27,7 +27,6 @@ const getPublicData = async (req, res) => {
 
 // controller function to add a survey
 const addSurvey = async (req, res) => {
-  // get survey details passed by the user
   const surveyDetails = req.body;
 
   const surveyDocument = new SurveyModel(surveyDetails);
@@ -107,7 +106,6 @@ const deleteSurvey = async (req, res) => {
         .send({ message: "category_name and survey_name are required" });
     }
 
-    // remove the survey from the category's surveys array
     const updated = await SurveyModel.findOneAndUpdate(
       { category_name },
       { $pull: { surveys: { survey_name } } },
@@ -120,7 +118,6 @@ const deleteSurvey = async (req, res) => {
         .send({ message: "Category or survey not found" });
     }
 
-    // if no surveys left in this category, delete the whole category document
     if (!updated.surveys || updated.surveys.length === 0) {
       await SurveyModel.deleteOne({ _id: updated._id });
       return res.send({
@@ -139,11 +136,11 @@ const deleteSurvey = async (req, res) => {
   }
 };
 
-// ✅ Frontend origin fallback for link building (for emails)
+// Frontend origin fallback for link building (for emails)
 const FRONTEND_ORIGIN =
   process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
-// ✅ email controller (uses utils/mailer, never hangs)
+// email controller (uses utils/mailer, never hangs)
 const sendEmail = async (req, res) => {
   try {
     const { to, subject, category_name, survey_name, link, share } = req.body;
@@ -188,17 +185,15 @@ const sendEmail = async (req, res) => {
       </div>
     `;
 
-    // ✅ fire-and-forget; in production (ENABLE_EMAIL=false) this is a no-op
+    // fire-and-forget; Resend will deliver if EMAIL_ENABLED=true
     sendMailHelper({
-      from: process.env.SMTP_MAIL,
       to,
       subject: subject || `Survey: ${survey_name}`,
       html,
     });
 
-    // ✅ always respond quickly so frontend stops "Sending…"
     res.status(200).send({
-      message: "Survey email queued (or skipped in demo mode)",
+      message: "Survey email queued",
       link: surveyLink,
     });
   } catch (err) {
