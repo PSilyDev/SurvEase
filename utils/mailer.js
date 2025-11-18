@@ -1,9 +1,9 @@
 // utils/mailer.js
 const nodemailer = require("nodemailer");
+require("dotenv").config();
 
 const ENABLE_EMAIL = process.env.ENABLE_EMAIL === "true";
 
-// Only create transporter when email is explicitly enabled (e.g. on localhost)
 let transporter = null;
 
 if (ENABLE_EMAIL) {
@@ -17,7 +17,6 @@ if (ENABLE_EMAIL) {
     },
   });
 
-  // Optional: verify, but don't crash on failure
   transporter.verify((err) => {
     if (err) {
       console.error("SMTP verify error (ignored):", err.message);
@@ -27,7 +26,7 @@ if (ENABLE_EMAIL) {
   });
 }
 
-async function sendSignupEmail(options) {
+async function sendEmail(options) {
   if (!transporter) {
     console.log("Email disabled, skipping send:", options.to);
     return;
@@ -40,4 +39,8 @@ async function sendSignupEmail(options) {
   }
 }
 
-module.exports = { sendSignupEmail };
+// keep backwards compatibility
+module.exports = {
+  sendEmail,
+  sendSignupEmail: sendEmail,
+};

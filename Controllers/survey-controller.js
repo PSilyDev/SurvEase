@@ -1,57 +1,59 @@
+// Controllers/survey-controller.js
+
 // import the SurveyModel schema from the db
-const { default: mongoose } = require('mongoose');
-const SurveyModel = require('../storeSurveysDB')
-const nodemailer = require('nodemailer');
-require('dotenv').config()
+const { default: mongoose } = require("mongoose");
+const SurveyModel = require("../storeSurveysDB");
+require("dotenv").config();
+
+// ✅ use shared mail helper instead of raw nodemailer here
+const { sendEmail: sendMailHelper } = require("../utils/mailer");
+
 let nanoid;
 (async () => {
   const mod = await import("nanoid");
   nanoid = mod.nanoid;
 })();
 
-
 // controller function to get request
-const getSurveys = async(req, res) => {
-    // console.log('inside geturveys - get - ', req.headers)
-    let surveyList = await SurveyModel.find()
+const getSurveys = async (req, res) => {
+  const surveyList = await SurveyModel.find();
+  res.send({ message: "All surveys - ", payload: surveyList });
+};
 
-    res.send({ message: "All surveys - ", payload: surveyList})
-}
-
-const getPublicData = async(req, res) => {
-    let surveyList = await SurveyModel.find()
-
-    res.send({ message: "All surveys - ", payload: surveyList})
-}
+const getPublicData = async (req, res) => {
+  const surveyList = await SurveyModel.find();
+  res.send({ message: "All surveys - ", payload: surveyList });
+};
 
 // controller function to add a survey
-const addSurvey = async(req, res) => {
-    // get survey details passed by the user
-    const surveyDetails = req.body;
+const addSurvey = async (req, res) => {
+  // get survey details passed by the user
+  const surveyDetails = req.body;
 
-    let surveyDocument = new SurveyModel(surveyDetails);
+  const surveyDocument = new SurveyModel(surveyDetails);
+  const newSurvey = await surveyDocument.save();
 
-    let newSurvey = await surveyDocument.save()
+  res.status(201).send({
+    message: "Survey added successfully!",
+    payload: newSurvey,
+  });
+};
 
-    res.status(201).send({ message: "Survey added successfully!", payload: newSurvey})
-}
+// controller for updating survey (addToSet)
+const updateSurvey = async (req, res) => {
+  const surveyDetails = req.body;
 
-// controller for updating survey
-const updateSurvey = async(req, res) => {
-    const surveyDetails = req.body;
-    
-    
-    let data = await SurveyModel.updateOne(
-        {_id: surveyDetails.category_id},
-        {$addToSet: {surveys: surveyDetails.updated_surveys}}
-    )
-    if(data === null){
-        res.status(200).send({message: "survey not updated", payload: data})
-    }
-    else{
-        res.status(200).send({message: "survey updated", payload: data})
-    }
-}
+  const data = await SurveyModel.updateOne(
+    { _id: surveyDetails.category_id },
+    { $addToSet: { surveys: surveyDetails.updated_surveys } }
+  );
+
+  if (data === null) {
+    res.status(200).send({ message: "survey not updated", payload: data });
+  } else {
+    res.status(200).send({ message: "survey updated", payload: data });
+  }
+};
 
 // controller for replacing survey
 const replaceSurvey = async (req, res) => {
@@ -64,9 +66,11 @@ const replaceSurvey = async (req, res) => {
     if (updatedSurvey.matchedCount === 0) {
       return res.status(404).json({ message: "Category not found" });
     }
-    return res.status(200).json({ message: "Survey updated", payload: updatedSurvey });
+    return res
+      .status(200)
+      .json({ message: "Survey updated", payload: updatedSurvey });
   } catch (error) {
-    console.error('error replacing survey - ', error);
+    console.error("error replacing survey - ", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -77,32 +81,20 @@ const publishSurvey = async (req, res) => {
 
   const updated = await SurveyModel.findOneAndUpdate(
     { category_name, "surveys.survey_name": survey_name },
-    { $set: { "surveys.$.published": true, "surveys.$.shareId": shareId } },
+    {
+      $set: {
+        "surveys.$.published": true,
+        "surveys.$.shareId": shareId,
+      },
+    },
     { new: true }
   );
 
-  if (!updated) return res.status(404).send({ message: "Survey not found" });
+  if (!updated)
+    return res.status(404).send({ message: "Survey not found" });
+
   res.send({ message: "Survey published", payload: { shareId } });
 };
-
-let transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: Number(process.env.SMTP_PORT) === 465, // 465 => secure
-  service: 'gmail',
-  auth: {
-    user: process.env.SMTP_MAIL,
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("SMTP verify error:", error);
-  } else {
-    console.log("SMTP server is ready to send messages!");
-  }
-});
 
 // delete a single survey; delete category doc if it becomes empty
 const deleteSurvey = async (req, res) => {
@@ -110,7 +102,9 @@ const deleteSurvey = async (req, res) => {
     const { category_name, survey_name } = req.body;
 
     if (!category_name || !survey_name) {
-      return res.status(400).send({ message: "category_name and survey_name are required" });
+      return res
+        .status(400)
+        .send({ message: "category_name and survey_name are required" });
     }
 
     // remove the survey from the category's surveys array
@@ -121,7 +115,9 @@ const deleteSurvey = async (req, res) => {
     );
 
     if (!updated) {
-      return res.status(404).send({ message: "Category or survey not found" });
+      return res
+        .status(404)
+        .send({ message: "Category or survey not found" });
     }
 
     // if no surveys left in this category, delete the whole category document
@@ -143,55 +139,75 @@ const deleteSurvey = async (req, res) => {
   }
 };
 
+// ✅ Frontend origin fallback for link building (for emails)
+const FRONTEND_ORIGIN =
+  process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
-
+// ✅ email controller (uses utils/mailer, never hangs)
 const sendEmail = async (req, res) => {
   try {
     const { to, subject, category_name, survey_name, link, share } = req.body;
 
-    // Prefer client-provided link; otherwise build one
-    const origin =
-      req.headers.origin ||
-      process.env.APP_URL ||          // e.g. https://surveyease.app
-      'http://localhost:5173';        // dev default
+    if (!to) {
+      return res
+        .status(400)
+        .send({ message: "Recipient email (to) is required" });
+    }
 
     const safe = encodeURIComponent;
-    const built = `${origin}/take/${safe(category_name)}/${safe(survey_name)}${share ? `?share=${safe(share)}` : ''}`;
+
+    const origin =
+      link?.startsWith("http") && link
+        ? null
+        : req.headers.origin ||
+          process.env.APP_URL ||
+          FRONTEND_ORIGIN;
+
+    const built =
+      origin &&
+      `${origin}/take/${safe(category_name)}/${safe(survey_name)}${
+        share ? `?share=${safe(share)}` : ""
+      }`;
+
     const surveyLink = link || built;
 
     const html = `
       <div style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.6;color:#111">
         <h2 style="margin:0 0 8px">You're invited to a survey</h2>
-        <p style="margin:0 0 16px"><strong>${category_name}</strong> • <strong>${survey_name}</strong></p>
+        <p style="margin:0 0 16px">
+          <strong>${category_name}</strong> • <strong>${survey_name}</strong>
+        </p>
         <a href="${surveyLink}" 
            style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none">
           Take the survey
         </a>
-        <p style="margin:16px 0 0">or copy this link:<br/>
+        <p style="margin:16px 0 0">
+          or copy this link:<br/>
           <a href="${surveyLink}">${surveyLink}</a>
         </p>
       </div>
     `;
 
-    await transporter.sendMail({
+    // ✅ fire-and-forget; in production (ENABLE_EMAIL=false) this is a no-op
+    sendMailHelper({
       from: process.env.SMTP_MAIL,
       to,
       subject: subject || `Survey: ${survey_name}`,
       html,
     });
 
-    res.send({ message: 'Email sent successfully!' });
+    // ✅ always respond quickly so frontend stops "Sending…"
+    res.status(200).send({
+      message: "Survey email queued (or skipped in demo mode)",
+      link: surveyLink,
+    });
   } catch (err) {
-    console.error("Email send error:", err); // <— see exact cause
+    console.error("Email send error:", err);
     res.status(500).send({
-    message: 'Failed to send email',
-    error: err?.response || err?.message || String(err),
-  });
+      message: "Failed to send email",
+    });
   }
 };
-
-
 
 // export controllers to survey-api
 module.exports = {
