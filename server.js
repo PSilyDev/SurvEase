@@ -3,36 +3,19 @@
 // step 1 - create express app
 const exp = require("express");
 const app = exp();
-const path = require("path");
 require("dotenv").config();
 require("./db"); // initializes the DB connection
 
-// ✅ CORS (allow frontend from env + localhost)
+// ✅ CORS – allow all origins (no cookies used, so this is fine)
 const cors = require("cors");
-
-const allowedOrigins = [
-  "http://localhost:5173",
-  process.env.FRONTEND_URL,
-].filter(Boolean); // remove undefined
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // allow non-browser tools like Postman (no origin)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        console.log("❌ Blocked by CORS:", origin);
-        return callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
+    origin: "*",
   })
 );
 
-// ✅ JSON body parser (no need to call express.json twice)
+// ✅ JSON body parser
 app.use(exp.json({ limit: "1mb" }));
 
 // --------------USER API--------------------------------
