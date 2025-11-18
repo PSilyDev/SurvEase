@@ -1,0 +1,29 @@
+get http://localhost:4000/survey-api/surveys
+
+### post survey
+post http://localhost:4000/survey-api/survey
+Content-Type: application/json
+
+{
+    
+    "category_name": "Category A",
+    "surveys": [
+    {
+        "survey_name": "Survey 1",
+        "questions": [
+        {
+            "id": "0",
+            "text": "What is the color of the car?",
+            "type": "radio",
+            "options": [
+            "Red",
+            "Green",
+            "Blue",
+            "Yellow"
+            ]
+        }
+        ]
+    }
+    ]
+    
+}

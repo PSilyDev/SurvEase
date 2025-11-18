@@ -1,0 +1,35 @@
+get http://localhost:4000/user-api/users
+
+
+### register
+post http://localhost:4000/user-api/users
+Content-Type: application/json
+
+{
+    "username": "Paul",
+    "email": "paul@gmail.com",
+    "password": "paul"
+}
+
+### login
+post http://localhost:4000/user-api/user
+Content-Type: application/json
+
+{
+    "username": "Paul",
+    "password": "paul"
+}
+
+### find by username
+get http://localhost:4000/user-api/users/John Lennon
+
+
+### update user by user id
+put http://localhost:4000/user-api/userss
+Content-Type: application/json
+
+{
+    "id": "65d81ffc07a4e2348494576e", 
+    "username": "John Lennon", 
+    "email": "johnlennon@gmail.com"
+}
